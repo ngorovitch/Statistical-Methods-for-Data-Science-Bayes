@@ -1,0 +1,294 @@
+---
+title: "SMDS-HW1-MalickSarr"
+author: "Sarr Malick"
+date: "May 9, 2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+## 1) A-R algorithm
+
+#### a) show how it is possible to simulate from a standard Normal distribution using pseudo-random
+deviates from a standard Cauchy and the A-R algorithm
+
+Suppose that $Y \sim f˜$
+$Y (y)$ with $y \in Y $ and that we want to consider the distribution of $X$ such that its density, $fX (⋅)$, possibly up to a positive proportionality constant is given by
+$fX (y) = f˜$ $Y(y)IX$ with $\forall y \in x \subset y$
+
+Since $X ⊂ Y $ then $I_X(y)\leq 1$  with $ \forall y \in Y$
+
+From the suppositions above we can say that $\widetilde{f}_X(.) \propto \widetilde{f}_Y(y)I_X(y)$ with the probability of X
+
+$$\widetilde{f}_X(y)= \frac{\widetilde{f}_Y(y)I_X(y)}{\int_YI_X(z)\widetilde{f}_Y(z)dz} = \frac{1}{\int_X\widetilde{f}_Y(z)dz}\widetilde{f}_Y(y)I_X(y) $$
+That will allow us to verify wether or not we are in the condition for the A/R algorithm because $f_X(y) = \widetilde{f}_Y(y)I_X(y)\leq\widetilde{f}_Y(y)$ with $\forall y \in Y$ 
+   
+Ergo in order to make a simulation according to the A-R algorithm we need the following:
+1) simultate a candidate distritution $Y \sim \widetilde{f}_Y(.)$
+2) a target distribution $f_X(x)$ from which the AR can be computed
+
+The ration between the above two gives the acceptance probability of the so called auxiliary bernoulli experiment which leads with probability 1 or 0 to the acceptance/rejection (respectively). 
+
+For this problem, the target distribution will be $f_x(x)\sim N(0,1)$ and the candidate distribution will be $Y\sim Cauchy(0,1)$
+
+
+#### b) provide your R code for the implementation of the A-R;
+
+
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1788832)
+# setting up the disctributions
+target = function(x) (dnorm(x, 0, 1)) # normal distribution
+canditate = function(x) (dcauchy(x, 0, 1)) # cauchi distribution
+# ratio for Acceptance Proba
+aux_bern = function(x) (target(x)/canditate(x))
+optimization = optimize(aux_bern, interval = c(-10, 10), maximum = T)
+```
+
+Once we have the various function set up, we can go ahead and visualize them. Remember that our acceptance probability was given by the ratio $\frac{f_X(y)}{kq(y)}$ with k corresponding to the limit of $f(x)$ meaning that our target distribution will not go above that bound.
+
+```{r}
+# deriving k which corresponds to the objective of the optimization routine
+k = optimization$objective
+k
+```
+
+Once we have derived the objective function, we can easily deduce the limit of $f(X)$ which is the product beween the objective $k$ and our candidate distribution. On the plot below we can observe a somewhat similar curve between the target distribution and the limit, with the target always being below or equal to the limit.
+
+```{r, echo=FALSE}
+limit_f = function(x) (k*canditate(x))
+curve(target(x), col = "grey", from = -6, to = 6, ylim= c(0, 0.55), lwd = 2, ylab = "f(x)", main = "Limit vs Target Distibution" )
+curve(limit_f(x), col = "orchid", lwd = 2, add = T)
+legend("topright", legend=c("Target distr.", "Limit"), col=c('grey', "orchid"), lwd =2)
+```
+We can as well plot the ratio function, which will correspond to the general outline between the normal and the cauchy distribution, the curve will peak at $k$.
+
+```{r, echo=FALSE}
+curve(aux_bern(x),col = "orchid", xlim = c(-6, 6), ylim = c(0, 2), main = "Ratio between Normal and Cauchy", ylab = "Ratio", lwd = 2)
+abline(h = k, col = "grey", lty = 2, lwd = 2)
+legend("topright", legend=c("objective", "ratio curve"), col=c('grey', "orchid"), lwd =2)
+```
+
+
+
+#### c) evaluate numerically (approximately by MC) the acceptance probability;
+
+If we have a joint distribution $(Y, E)$, where $Y$ is the target distribution and $E$ is the acceptance event. Computing the acceptance probability should theoretically be the conditional acceptance probability $P(E=1\mid Y=y)$ (the rejection should be with $E = 0$). Ergo, that conditional will result in:
+
+$$
+P(E=1)=\int_{(0,1)}P(E=1\mid Y=y)f_U(y)dy=\int_{(0,1)}\frac{f_x(y)}{kf_U(y)}f_U(y)dy=\frac{1}{k}\int_{(0,1)}f_U(y)dy=\frac{1}{k}
+$$
+
+#### d) write your theretical explanation about how you have conceived your Monte Carlo estimate of theacceptance probability
+
+We know that our function $F_x(x)$ will never go above our limit, and we can think of our acceptance/rejection conditional even derived above as a bernoulli. Consequently, the theretical probability of acceptance can be derived approximatively by doing a simulation on the candidate diistribution along with a uniform one.The mathematical setup for the use of Monte Carlo for the acceptance probability will be as follow. We have $f_x(x)\leq kq(x) \quad \forall x \in \mathcal{Y}$ with $Y\sim q$  and $E\mid Y=y\sim Ber\bigg(\frac{f_x(Y)}{k\cdot q(y)}\bigg)$. Using Monte carlo, we wil have something like $$P(E)=E(Y^{acc.})\simeq\frac{1}{n}\displaystyle\sum_{i=1}^{n}Y^{acc}$$
+
+
+if we have to simulate the above, we will have something like this:
+
+```{r}
+# Set up of the number of simulation
+n = 10000
+# Simulation of n random cauchy and uniform draw 
+y = rcauchy(n, 0, 1)
+U  = runif(n, 0, 1)
+# Set up of the target and candidate distribution (same as above)
+target = function(x) dnorm(x, 0, 1)
+candidate = function(x) dcauchy(x, 0, 1)
+# derive the accepted 
+Y_accepted = y[U <= target(y)/(k*candidate(y))]
+accepted = length(Y_accepted)
+# derive the rejected
+Y_rejected = y[U > target(y)/(k*candidate(y))]
+rejected = length(Y_rejected)
+# Ratio of accepted/ n simulation
+empirical_acc = accepted/n
+empirical_acc
+# Ratio of rejected/ n simulation
+empirical_rej = length(Y_rejected)/n
+empirical_rej
+```
+
+#### e) save the rejected simulations and provide a graphical representation of the empirical distribution (histogram or density estimation)
+
+From the previous calculation we may easily plot the histogram of the empirical distribution of the rejected simulations.
+
+```{r}
+hist(Y_rejected, breaks = 100000, xlim = c(-10, 10), ylim = c(0, .2), probability = T, xlab = "Y rejected", col = "orchid", main = "Empirical Y rejected")
+```
+
+
+
+#### f) derive the underlying density corresponding to the rejected random variables and try to compare it with the empirical distribution
+
+
+In order to evaluate the underlying density of the rejected random variable, we can start form our Acceptance distribution defined as
+
+
+$$
+P \bigg(Y\leq y\mid U\leq \frac{f(y)}{kq(y)} \bigg)=\frac{F(y)}{kQ(y)} \frac{Q(y)}{1/k}=F_Y(y)
+$$
+
+From that we just need to derive the rejected numerical function which can be easily extracted from the acceptance ditribution function and will have the following form
+$$
+P \bigg(Y\leq y\mid U\geq \frac{f(Y)}{kq(Y)} \bigg)=\bigg( 1-\frac{F(y)}{kQ(y)} \bigg) \frac{Q(y)}{(1-1/k)}= \bigg( Q(y)-\frac{F(y)}{k} \bigg)\frac{1}{(1-1/k)}
+$$
+If we have to graphically represent the above along with the empircal distribution, we will have.
+ 
+
+```{r}
+hist(Y_rejected, breaks = 100000, xlim = c(-10, 10), ylim = c(0, .2), probability = T, xlab = "Y rejected", col = "orchid", main = "Histogram of Y rejected")
+num_rej = function(x) (dcauchy(x, 0, 1)-dnorm(x, 0, 1)/k)*(1/(1-1/k))
+curve(num_rej(x), col = "black", add = T, lwd = 2)
+legend("topright", legend=c("Und. Density", "Emp. Distro."), col=c('black', "orchid"), lwd =2)
+```
+
+
+
+## 2)Marginal likelihood evaluation for a Poisson data model. Simulate 10 observations from a known Poisson distribution with expected value 2. Use set.seed(123) before starting your simulation. Use a Gamma(1,1) prior distribution and compute the corresponding marginal likelihood in 3 differnt ways:
+
+
+####a) exact analytic computation;
+
+Here is the setup according to the above instructions
+prior : $\theta \sim Gamma(\alpha, \beta)$
+likelihood : $Y_1, ..., Y_n\mid \theta \sim Pois(\theta)$ 
+Join distrivution: $j(Y, \theta)=f(Y|\theta)f(\theta)$
+
+With this setup, extracting the marginal likelihood or normalizing constant of our poisson model with a gamma prior will be just the result of integrating the joint distributions over $\theta$. Hence, developping analytically the marginal likelihood will leave us with the following formula
+
+$$ m(y) = \int_{\Theta} L(\theta) \pi(\theta) d\theta = \int_{0}^{+\infty} \frac{\theta^{\sum y_i}e^{-\theta}}{\prod y_i!}\frac{\beta^{\alpha}}{\Gamma(\alpha)}e^{-\beta \theta} d \theta =\frac{\beta^{\alpha}}{\Gamma(\alpha)\prod y_i!}\frac{\Gamma \big(\sum y_i+\alpha \big)}{(\beta+n)^{\sum y_i + \alpha}}$$
+
+Now we just need to insert the likelihood and prior given in the instructions into the above formula which will give us:
+
+$$
+
+\frac{1}{\Gamma(1)\prod y_i!}\frac{\Gamma \big(\sum y_i+1 \big)}{10^{\sum y_i + 1}}
+
+$$
+
+```{r}
+set.seed(123)
+# Setup the likelihood (10 obs with expect value of 2)
+like = rpois(10, 2)
+# Setup the margival likelihood function as stated in the fomula derived above
+marg <- function(x, beta, alpha) {((beta^alpha)/(gamma(alpha)*prod(factorial(x))))*(gamma(sum(x)+alpha)/(beta + length(x))^(sum(x)+alpha))}
+# Plug in the likelyhood along the prior param
+exact_ana_comp = marg(like, 1, 1)
+exact_ana_comp
+```
+
+
+#### b) by Monte Carlo approximation using a sample form the posterior distribution and the harmonic mean approach. Try to evaluate random behaviour by repeating/iterating the approximation ˆI a sufficiently large number of times and show that the approximation tends to be (positively) biased. Use these simulations to evaluate approximately the corresponding variance and mean square error
+   
+
+Now we have to estimate the value of our marginal likelihood using Monte Carlo sampling with the harmonic mean approach. The estimation of $\hat$ is the following:
+In order to simulate a MCMC sample $\theta_1 ... \theta_t$ from a posterior $\pi(\theta \mid x)$; we will need the following setup:
+
+$$
+\hat\varepsilon^{HM}=\frac{1}{\frac{1}{t} \displaystyle\sum_{i=i}^{t}\frac{1}{L(\theta_i)}}
+$$
+
+One of the main problem of this harmonic mean approach for the approximation of the marginal likelihood is that there is no finite variance guaranteed.
+
+That being said, if we apply the same above principle to the problem, we will first create $\theta_1 ... \theta_t$ from the $\Gamma$ posterior distribution then repeat the same process n times to extract the true estimate. 
+
+```{r}
+# set up our hamonic mean approximator
+epsilon_hm <- function(x) 1/((1/length(x))*sum(1/x))
+# set up the number of iteration and random draws
+n = 1000
+draws = 10000
+result_HM = rep(NA, n)
+#run the simulation
+for(j in 1:n){
+  post = rgamma(draws, 1+ sum(like), 1 + length(like))
+  result = rep(NA, draws)
+  i = 0
+  for (e in post){
+    i = i+1
+    like_t = prod(dpois(like, e))
+    result[i]=like_t
+  }
+  result_HM[j] = epsilon_hm(result)
+}
+# Extract MSE, Bias and Variance
+bias_HM = mean(result_HM)- exact_ana_comp
+variance_HM = var(result_HM)
+MSE_HM = variance_HM + bias_HM^2
+print(c("MSE (HM)" = MSE_HM, "bias (HM)"=bias_HM, "Variance(HM)" = variance_HM ))
+```
+
+Let us know plot the histogram of the marginal likelihood estimated with the harmonic mean, and set a vertical line corresponding to the result obtained previously in the exact analytic computation. We can observe that most of the estimated marginal likelyhood are over the exact analytic computation which somewhat correspond to the true one and prooves the problem mentionned ealier about using the harmonic mean approach
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+hist(result_HM, freq = T, col ="orchid", breaks = 30, main = "Marginal likelihood estimated by HM", xlab = expression(paste(hat(I))))
+abline(v=exact_ana_comp, lwd = 2, col = "black")
+legend("topleft", legend=c("Analytic. cmpt.", "HM Est."), col=c('black', "orchid"), lwd =2)
+```
+
+
+#### c) by Monte Carlo Importance sampling choosing an appropriate Cauchy distribution as auxiliary distribution for the simulation. Compare its performance with respect to the previous harmonic mean approach.
+
+In order to simulate a MCMC sample $\theta_1 ... \theta_t$ from a prior $\pi(\theta)$; we will need the following setup:
+
+$$
+\hat\varepsilon^{AM}=\frac{1}{t} \displaystyle\sum_{i=i}^{t}L(\theta_i)
+$$
+
+One of the problem about the Importance Sampling approach is that it offers bad approximation in the usual peaked-likelihood situation. Very few points (if any at all) are simulated in the more relevant high-likelihood region
+
+Let's first graphically deduce a cauchy distribution close enough to $Gamma(1,1)$. Looking at the histogram below we will be working with $Cauchy(0, 0.34)$ as auxiliary distribution since it's the one that is close enough to the gamma.
+
+
+```{r}
+curve(dgamma(x, 1, 1), xlim = c(-5, 5), lwd = 3, main = "Fitting of different Cauchy with prior Gamma", ylab = "f(x)")
+curve(dcauchy(x, 0, .2), col = "orchid",lwd = 2,  add = T, xlim = c(-5, 5))
+curve(dcauchy(x, 0, .34), col = "purple", lwd = 2, add = T, xlim = c(-5, 5))
+curve(dcauchy(x, 0, .4), col = "blue", lwd = 2, add = T, xlim = c(-5, 5))
+curve(dcauchy(x, 0, .5), col = "lightblue",lwd = 2,  add = T, xlim = c(-5, 5))
+legend("topright", legend=c("Gamma(1, 1)","Cauchy(0, 0.2)", "Cauchy(0, 0.34)", "Cauchy(0, 0.4)", "Cauchy(0, 0.5)"), col=c("black","orchid",
+                                                                                                                          "purple", "blue","lightblue"), lty=1, lwd =2)
+```
+
+Now we can run approzimatively the same setup as the previous one but using the cauchi as auxiliary distribution for the simulation 
+
+
+```{r}
+# Setup apploximators
+Likel = function(x, plambda) prod(dpois(x, plambda))
+ratio = function(x) dgamma(x,1,1)/dcauchy(x,0,0.34)
+Likelihood = Vectorize(Likel,vectorize.args = 'plambda')
+# Setup the sampler
+sample_IS <- function(n){
+    cauchy = rcauchy(n, 0, 0.34)
+    cauchy = cauchy[cauchy>0]
+    result = (mean(Likelihood(like,cauchy)*ratio(cauchy)))/(mean(ratio(cauchy)))
+  return(result)
+}
+result_IS = rep(NA, n)
+# Run the simulations
+for (i in 1:n){
+  result_IS[i]=sample_IS(1000)
+}
+# Extract MSE, Bias and Variance
+bias_IS = mean(result_IS)-exact_ana_comp
+variance_IS = var(result_IS)
+MSE_IS = variance_IS + bias_IS^2
+print(c("MSE (IS)" = MSE_IS, "bias (IS)"=bias_IS, "Variance(IS)" = variance_IS ))
+```
+We can clearly see that with the Importance Sampling, we gave a MSE a smaller that the one with the harmonic mean. Looking at the histogram the value look like they are evenly distributed around the result obtained previously in the exact analytic computation, represented by the black line on the histogram below.
+
+
+
+```{r}
+hist(result_IS, col = "orchid", breaks = 40, main = "Marginal likelihood estimated by IS",xlab = expression(paste(hat(I))) )
+abline(v=exact_ana_comp, lwd = 2, col = "black")
+legend("topleft", legend=c("Analytic. cmpt.", "IS Est."), col=c('black', "orchid"), lwd =2)
+
+```
+
+
